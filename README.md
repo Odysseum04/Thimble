@@ -45,9 +45,6 @@ Les options se trouvent en haut du fichier `.sk`.
 | `perm-admin` | `events.admin` | Permission requise pour `/te` |
 | `world-name` | `world` | Nom du monde dédié au mini-jeu |
 
-> ⚠️ **Important — caractères interdits dans les options :**
-> Les caractères `<` et `>` sont **réservés par Skript** pour les types d'arguments dans les commandes (ex. `[<text>]`). Les utiliser dans une option comme `<SERVER-NAME>` provoquerait l'erreur `Can't understand this expression` partout où `%{@prefix}%` est évalué. Utiliser à la place des crochets `[SERVER-NAME]` ou simplement `SERVER-NAME` sans délimiteurs.
-
 ---
 
 ## Commandes
@@ -169,28 +166,7 @@ Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, b
 
 ## Bugs corrigés & notes techniques
 
-### Erreur : `Can't understand this expression: &r[&a<SERVER-NAME>...]`
-
-**Cause :** Les caractères `<` et `>` sont réservés par Skript pour les types d'arguments (`[<text>]`, `[<number>]`). Utilisés dans la valeur d'une option, ils sont interprétés comme une expression lors de l'évaluation de `%{@option}%`, provoquant une erreur sur **toutes les lignes** contenant ce placeholder.
-
-**Correction appliquée :** L'option `prefix` utilise désormais `SERVER-NAME` sans délimiteurs `< >`.
-
----
-
-### Erreur : `There's no loop that matches 'loop-player with volume X with pitch Y'`
-
-**Cause :** Dans le pattern `play sound "X" at LOC to PLAYER with volume V with pitch P`, Skript parsait `PLAYER with volume V with pitch P` comme une seule expression (le token `to` n'était pas traité comme séparateur de clause).
-
-**Correction appliquée :** Les sons utilisent la forme simplifiée `play sound "X" to PLAYER` sans paramètres volume/pitch, garantissant la compatibilité avec tous les parsers Skript 2.9+.
-
----
-
-### Erreur : `There's no location in a command event`
-
-**Cause :** Dans un trigger `command`, l'expression `world of player` force Skript à résoudre une location depuis le contexte de l'événement commande, ce qui échoue.
-
-**Correction appliquée :** Remplacement par la forme possessive `player's world` et `loop-player's world`, qui est résolue directement depuis l'entité sans passer par une location.
-
+### Merci de contacter "odysseum04" via discord.
 ---
 
 ## Variables internes
