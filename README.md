@@ -1,16 +1,14 @@
 # Thimble Event — Dé à Coudre
 
 > **Auteur :** Clément Raes — [Odysseum04](https://github.com/odysseum04)
-
 > **Assistance IA :** Script généré avec l'assistance de [Claude AI](https://claude.ai) (Anthropic)
-
 > **Compatibilité :** Skript 2.9+ | Minecraft 1.21.x | Aucun addon requis
 
 ---
 
 ## Vue d'ensemble
 
-Le **Dé à Coudre** (*Thimble*) est un mini-jeu multijoueur dans lequel les participants s'élancent à tour de rôle depuis une plateforme surélevée vers un bassin d'eau situé en contrebas. Le but est d'atterrir précisément sur une éponge mouillée (case valide). Chaque atterrissage réussi comble la case touchée — le bassin rétrécit progressivement au fil des tours. Un joueur qui rate le bassin et subit des dégâts de chute est définitivement éliminé. Le dernier survivant remporte la partie.
+Le **Dé à Coudre** (*Thimble*) est un mini-jeu multijoueur dans lequel les participants s'élancent à tour de rôle depuis une plateforme surélevée vers un bassin d'eau situé en contrebas. Le but est d'atterrir précisément sur une éponge mouillée (case valide). Chaque atterrissage réussi comble la case touchée — le bassin rétrécit progressivement. Un joueur qui rate le bassin et subit des dégâts de chute est définitivement éliminé. Le dernier survivant remporte la partie.
 
 ---
 
@@ -45,6 +43,15 @@ Les options se trouvent en haut du fichier `.sk`.
 | `perm-admin` | `events.admin` | Permission requise pour `/te` |
 | `world-name` | `world` | Nom du monde dédié au mini-jeu |
 
+> ⚠️ **Règles importantes pour les options :**
+>
+> **1. Pas de `< >` dans les valeurs** — ces caractères sont réservés par Skript pour les types d'arguments de commandes (ex. `[<text>]`). Les utiliser dans une option provoque `Can't understand this expression` partout où l'option est utilisée.
+>
+> **2. Ne jamais encadrer `{@option}` avec `%...%`** — `{@option}` est une **substitution parse-time** résolue au chargement du script. Le wrapper `%...%` force une évaluation runtime qui échoue car la valeur contient des codes couleur Minecraft (`&r`, `&a`, etc.).
+>
+> ✅ Correct : `send "{@prefix} &aTexte..." to player`
+> ❌ Incorrect : `send "%{@prefix}% &aTexte..." to player`
+
 ---
 
 ## Commandes
@@ -52,93 +59,61 @@ Les options se trouvent en haut du fichier `.sk`.
 Toutes les commandes requièrent la permission `events.admin` et doivent être exécutées depuis le monde configuré.
 
 ### `/te setspawn`
-
 Définit la position actuelle comme **plateforme de départ**. À exécuter avant tout lancement.
 
-```
-/te setspawn
-```
-
 ### `/te start`
-
-Lance une nouvelle partie dans l'ordre suivant :
-
+Lance une nouvelle partie :
 1. Vérifie qu'aucune partie n'est déjà en cours.
-2. Vérifie qu'une plateforme a été définie via `/te setspawn`.
+2. Vérifie qu'une plateforme a été définie.
 3. Vérifie la présence d'au moins **2 joueurs** dans le monde configuré.
 4. Remplace tous les blocs de **diorite** dans un rayon de 100 blocs par de l'**eau**.
-5. Lance un **compte à rebours de 5 secondes** avec titres et sons.
+5. Lance un **compte à rebours de 5 secondes**.
 6. Enregistre les joueurs et démarre le premier tour.
 
-```
-/te start
-```
-
-> ⚠️ Le remplacement de blocs en rayon 100 peut générer une charge serveur temporaire. Réduire le rayon dans le code si nécessaire.
+> ⚠️ Le remplacement de blocs en rayon 100 peut générer une charge serveur temporaire.
 
 ### `/te stop`
-
 Arrête immédiatement la partie. Tous les joueurs du monde configuré passent en mode **Aventure**.
 
-```
-/te stop
-```
-
 ### `/te info`
-
-Affiche l'état actuel du jeu : statut, nombre de joueurs, file d'attente, plateforme définie ou non.
-
-```
-/te info
-```
+Affiche le statut, nombre de joueurs, file d'attente et état de la plateforme.
 
 ---
 
 ## Mécaniques de jeu
 
 ### Tour par tour
-
-Un seul joueur est **actif** (mode Survie) à la fois. Les autres spectent depuis la plateforme en mode Spectateur.
+Un seul joueur est **actif** (mode Survie) à la fois. Les autres attendent en mode Spectateur.
 
 ### La vague
-
-Les joueurs jouent par **cycles** (vagues). Chaque joueur saute une fois par cycle. Quand tous ont sauté, une nouvelle vague commence avec les joueurs restants.
+Les joueurs jouent par cycles. Quand tous ont sauté une fois, une nouvelle vague recommence avec les joueurs restants.
 
 ### Atterrissage réussi — Éponge mouillée
-
-Lorsqu'un joueur actif marche sur une **éponge mouillée** :
-- Un bloc de **diorite** est placé dessus → la case est **comblée**, le bassin rétrécit.
+- Un bloc de **diorite** est placé au-dessus → la case est comblée, le bassin rétrécit.
 - Le joueur est renvoyé en **attente** (non éliminé).
-- Le joueur suivant dans la file est activé.
-
-### Raté — Dégâts de chute
-
-Lorsqu'un joueur actif **reçoit des dégâts** :
-- Les dégâts sont annulés (pas de mort réelle).
-- Le joueur est **éliminé définitivement** → mode Spectateur.
-- Broadcast avec le nombre de joueurs restants.
 - Le joueur suivant est activé.
 
-### Faim
+### Raté — Dégâts de chute
+- Les dégâts sont annulés (pas de mort réelle).
+- Le joueur est **éliminé définitivement**.
+- Broadcast avec le nombre de joueurs restants.
 
-La barre de faim est **gelée** pour le joueur actif — tout changement est annulé.
+### Faim
+Gelée pour le joueur actif — tout changement est annulé.
 
 ### Déconnexion
 
 | Situation | Comportement |
 |---|---|
 | Joueur **actif** se déconnecte | Éliminé, broadcast, tour suivant |
-| Joueur en **attente** se déconnecte | Retiré silencieusement des listes |
+| Joueur en **attente** se déconnecte | Retiré silencieusement |
 
 ### Victoire
-
-Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, broadcast et son de victoire pour tous les joueurs du monde.
+Quand il ne reste qu'un seul joueur — titre, broadcast et son de victoire.
 
 ---
 
 ## Construction de l'arène
-
-### Structure recommandée
 
 ```
         [Plateforme de départ]   ← /te setspawn ici
@@ -152,21 +127,37 @@ Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, b
     └─────────────────────┘
 ```
 
-### Blocs utilisés
-
 | Bloc | Rôle |
 |---|---|
 | **Diorite** | Remplisseur initial du bassin → remplacé par de l'eau au lancement |
 | **Eau** | Bassin de réception |
 | **Éponge mouillée** | Zone d'atterrissage valide → comblée après chaque saut réussi |
 
-> 💡 Poser les éponges mouillées **au fond du bassin** sur un bloc solide, avec une couche d'eau par-dessus. L'eau ne doit pas être trop profonde pour que `on walk on wet sponge` se déclenche quand le joueur touche le fond.
+> 💡 Poser les éponges au **fond du bassin** sur un bloc solide. L'eau ne doit pas être trop profonde pour que `on walk on wet sponge` se déclenche.
 
 ---
 
 ## Bugs corrigés & notes techniques
 
-### Merci de contacter "odysseum04" via discord.
+### Erreur : `Can't understand this expression: &r[&aSERVER-NAME...]`
+**Cause :** `{@option}` est une substitution parse-time. L'encadrer avec `%...%` force Skript à l'évaluer au runtime, ce qui échoue car la valeur contient des codes couleur.
+**Correction :** `"%{@prefix}%"` → `"{@prefix}"` dans toutes les chaînes.
+
+---
+
+### Erreur : `There's no loop that matches 'loop-player with volume X with pitch Y'`
+**Cause :** Skript parsait `to loop-player with volume X with pitch Y` comme une expression unique.
+**Correction :** Sons en forme simplifiée `play sound "X" to PLAYER`.
+
+---
+
+### Erreur : `There's no location in a command event`
+**Cause :** Dans un `command` trigger, Skript n'expose pas de location implicite. Toute expression résolvant le monde d'un joueur (`player's world`, `world of player`, `world of location of player`) requiert ce contexte de location, absent dans les triggers commande.
+
+**Correction (deux niveaux) :**
+1. **`te_playerWorldName(p)`** — convertit le monde du joueur en texte via `"%world of {_p}%"` depuis une fonction, qui possède son propre contexte d'exécution sans cette restriction.
+2. **`te_isInConfiguredWorld(p)`** — compare le résultat de `te_playerWorldName()` à `{@world-name}` et retourne un booléen. Cette fonction est appelée partout où une vérification de monde est nécessaire, y compris dans le command trigger.
+
 ---
 
 ## Variables internes
@@ -175,11 +166,11 @@ Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, b
 |---|---|---|
 | `{te.spawn}` | Location | Position de la plateforme de départ |
 | `{te.running}` | Boolean | `true` si une partie est en cours |
-| `{te.joueurs::*}` | Liste | Joueurs encore en jeu (non éliminés) |
+| `{te.joueurs::*}` | Liste | Joueurs encore en jeu |
 | `{te.vague::*}` | Liste | File d'attente du cycle courant |
 | `{te.%uuid%.playing}` | Boolean | `true` si ce joueur est le joueur actif |
 
-> Les joueurs sont indexés par **UUID** — pas de conflit en cas de changement de pseudo.
+> Indexées par **UUID** — pas de conflit en cas de changement de pseudo.
 
 ---
 
@@ -187,13 +178,18 @@ Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, b
 
 | Fonction | Description |
 |---|---|
-| `te_setWaiting(p)` | Spectateur, téléport au spawn, titre d'attente |
-| `te_setSpectating(p)` | Élimination définitive, son de mort |
-| `te_setPlaying(p)` | Activation du joueur (survie), téléport, son de départ |
-| `te_cleanLists()` | Suppression des entrées invalides (déconnectés) |
-| `te_nextPlayer()` | Sélection du prochain sauteur ou fin de partie |
-| `te_endGame()` | Annonce du vainqueur, nettoyage des variables |
-| `te_forceStop(stopper)` | Arrêt admin avec broadcast |
+| `te_playerWorldName(p)` | Retourne le nom du monde du joueur |
+| `te_isInConfiguredWorld(p)` | Vérifie si le joueur est dans le monde configuré |
+| `te_setWaiting(p)` | Place le joueur en attente (spectateur) |
+| `te_setSpectating(p)` | Élimine le joueur (spectateur permanent) |
+| `te_setPlaying(p)` | Active le joueur (survie), le téléporte, le retire de la vague |
+| `te_cleanLists()` | Nettoie les entrées invalides (joueurs déconnectés) |
+| `te_nextPlayer()` | Sélectionne le prochain sauteur ou termine la partie |
+| `te_endGame()` | Annonce le vainqueur et nettoie les variables |
+| `te_forceStop(stopper)` | Arrêt forcé avec broadcast |
+| `te_countPlayersInWorld()` | Compte les joueurs dans le monde configuré |
+| `te_registerPlayers()` | Enregistre les joueurs du monde dans les listes de jeu |
+| `te_countdown()` | Compte à rebours 5s avec titres et sons |
 
 ---
 
@@ -215,8 +211,9 @@ Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, b
     │
     ├─ Vérifications (en cours ? spawn ? ≥ 2 joueurs ?)
     ├─ Diorite → Eau (rayon 100 blocs)
-    ├─ Compte à rebours 5s
-    ├─ Enregistrement → te_setWaiting(tous)
+    ├─ te_countdown() — compte à rebours 5s
+    ├─ te_registerPlayers() — enregistrement + te_setWaiting(tous)
+    ├─ broadcast démarrage
     └─ te_nextPlayer()
             │
             ├─ 1 joueur restant ? → te_endGame() ── FIN
@@ -235,11 +232,12 @@ Quand il ne reste **qu'un seul joueur**, il est déclaré vainqueur — titre, b
 
 | Version | Description |
 |---|---|
-| 2.1 | Correction `<SERVER-NAME>` → `SERVER-NAME` (caractères `<>` réservés par Skript) |
-| 2.1 | Correction `play sound` : suppression volume/pitch inline (bug de parsing Skript) |
-| 2.1 | Correction `world of player` → `player's world` dans les triggers commande |
-| 2.0 | Réécriture complète Skript 2.9+ / 1.21.x, suppression addons dépréciés |
-| 2.0 | UUID pour les variables joueurs, gestion déconnexion, `/te info` |
+| 2.3 | Ajout de `te_playerWorldName()` et `te_isInConfiguredWorld()` — correction finale de `There's no location in a command event` |
+| 2.2 | Correction `%{@prefix}%` → `{@prefix}` (parse-time vs runtime) |
+| 2.2 | Extraction des boucles par monde dans des fonctions dédiées |
+| 2.1 | Correction `<SERVER-NAME>` → `SERVER-NAME` (caractères `<>` réservés) |
+| 2.1 | Simplification de `play sound` (suppression volume/pitch inline) |
+| 2.0 | Réécriture complète pour Skript 2.9+ / Minecraft 1.21.x |
 | 1.0 | Version initiale — Skript 1.12.2 + SkQuery / TuSKe / skRayFall / Skellett |
 
 ---
