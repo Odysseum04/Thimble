@@ -1,0 +1,313 @@
+#
+# ╔══════════════════════════════════════════════════════════╗
+# ║           Thimble Event - Dé à Coudre Minigame           ║
+# ║   Compatible : Skript 2.9+ | Minecraft 1.21.x            ║
+# ║   Aucun addon requis                                     ║
+# ╠══════════════════════════════════════════════════════════╣
+# ║  Auteur  : Clément Raes (Odysseum04)                     ║
+# ║  GitHub  : https://github.com/odysseum04                 ║
+# ║  Note    : Script généré avec l'assistance de Claude AI  ║
+# ╠══════════════════════════════════════════════════════════╣
+# ║  Mécaniques :                                            ║
+# ║   - Un seul joueur est actif (survie) à la fois          ║
+# ║   - Marcher sur une éponge mouillée → saut réussi        ║
+# ║   - Recevoir des dégâts (raté le bassin) → élimination   ║
+# ║   - Le bassin rétrécit au fil des tours                  ║
+# ║   - Le dernier survivant remporte la partie              ║
+# ╠══════════════════════════════════════════════════════════╣
+# ║  Commandes (permission : events.admin) :                 ║
+# ║   /te setspawn  → Définit le point de départ             ║
+# ║   /te start     → Lance la partie                        ║
+# ║   /te stop      → Arrête la partie en cours              ║
+# ║   /te info      → Affiche l'état du jeu                  ║
+# ╚══════════════════════════════════════════════════════════╝
+#
+# NOTES DE CONFIGURATION :
+#  - Remplacer "SERVER-NAME" dans l'option prefix par le nom de votre serveur.
+#  - Ne pas utiliser < > dans les options : caractères réservés par Skript.
+#  - Changer "world" par le nom de votre monde dédié si nécessaire.
+#
+
+# ══════════════════════════════════════════════
+#  Options globales
+# ══════════════════════════════════════════════
+
+options:
+    # /!\ Ne pas utiliser < > dans cette valeur — caractères réservés par Skript
+    prefix:     &r[&aSERVER-NAME &cEvents&r]
+    perm-admin: events.admin
+    world-name: world
+
+# ══════════════════════════════════════════════
+#  Fonctions : Gestion des états des joueurs
+# ══════════════════════════════════════════════
+
+# Passe un joueur en mode "attente" (spectateur, attend son tour de sauter)
+function te_setWaiting(p: player):
+    set {te.%uuid of {_p}%.playing} to false
+    teleport {_p} to {te.spawn}
+    set game mode of {_p} to spectator
+    send title "" with subtitle "&eAttendez votre tour de sauter..." to {_p} for 1 hour
+
+# Passe un joueur en mode "éliminé" (a raté son saut)
+function te_setSpectating(p: player):
+    set {te.%uuid of {_p}%.playing} to false
+    teleport {_p} to {te.spawn}
+    set game mode of {_p} to spectator
+    send title "&c✗ Éliminé !" with subtitle "&7Vous avez raté votre saut..." to {_p} for 5 seconds
+    play sound "entity.player.death" to {_p}
+
+# Passe un joueur en mode "actif" (c'est son tour de sauter)
+function te_setPlaying(p: player):
+    set {te.%uuid of {_p}%.playing} to true
+    teleport {_p} to {te.spawn}
+    heal {_p}
+    set food level of {_p} to 20
+    set game mode of {_p} to survival
+    send title "&e➤ À vous de sauter !" with subtitle "&7Visez le bassin !" to {_p} for 3 seconds
+    play sound "block.note_block.pling" to {_p}
+    remove {_p} from {te.vague::*}
+
+# ══════════════════════════════════════════════
+#  Fonctions : Logique de la partie
+# ══════════════════════════════════════════════
+
+# Nettoie les entrées invalides (joueurs déconnectés) des listes de jeu
+function te_cleanLists():
+    loop {te.joueurs::*}:
+        if loop-value is not a player:
+            remove loop-value from {te.joueurs::*}
+    loop {te.vague::*}:
+        if loop-value is not a player:
+            remove loop-value from {te.vague::*}
+
+# Passe au joueur suivant dans la file, ou termine la partie
+function te_nextPlayer():
+    if {te.running} is not true:
+        stop
+
+    wait 2 seconds
+
+    if {te.running} is not true:
+        stop
+
+    te_cleanLists()
+
+    # Un seul joueur (ou moins) restant → victoire
+    if size of {te.joueurs::*} <= 1:
+        te_endGame()
+        stop
+
+    # Recharge la vague si tous les joueurs ont déjà sauté ce cycle
+    if size of {te.vague::*} <= 0:
+        loop {te.joueurs::*}:
+            add loop-value to {te.vague::*}
+
+    # Le prochain joueur à sauter est le dernier de la file
+    set {_next} to last element of {te.vague::*}
+    if {_next} is a player:
+        te_setPlaying({_next})
+    else:
+        # Entrée invalide (déconnecté) : on passe au suivant
+        remove {_next} from {te.vague::*}
+        te_nextPlayer()
+
+# Annonce le vainqueur et remet le jeu en état propre
+function te_endGame():
+    set {_winner} to first element of {te.joueurs::*}
+
+    loop all players:
+        if name of loop-player's world is {@world-name}:
+            set game mode of loop-player to adventure
+            set {te.%uuid of loop-player%.playing} to false
+
+    if {_winner} is a player:
+        broadcast "%{@prefix}% &6☆ %{_winner}% &aremporte le Dé à Coudre ! Félicitations !"
+        loop all players:
+            if name of loop-player's world is {@world-name}:
+                send title "&6☆ %{_winner}%" with subtitle "&aremporte la partie !" to loop-player for 5 seconds
+                play sound "ui.toast.challenge_complete" to loop-player
+    else:
+        broadcast "%{@prefix}% &cLa partie s'est terminée sans vainqueur."
+
+    set {te.running} to false
+    delete {te.joueurs::*}
+    delete {te.vague::*}
+
+# Arrête la partie de force (commande /te stop)
+function te_forceStop(stopper: text):
+    loop all players:
+        if name of loop-player's world is {@world-name}:
+            set {te.%uuid of loop-player%.playing} to false
+            set game mode of loop-player to adventure
+            send title "" with subtitle "&cLa partie a été arrêtée." to loop-player for 3 seconds
+
+    broadcast "%{@prefix}% &cLa partie a été arrêtée par &f%{_stopper}%&c."
+
+    set {te.running} to false
+    delete {te.joueurs::*}
+    delete {te.vague::*}
+
+# ══════════════════════════════════════════════
+#  Commande principale : /te
+# ══════════════════════════════════════════════
+
+command /te [<text>]:
+    permission: {@perm-admin}
+    permission message: &cVous n'avez pas la permission d'exécuter cette commande.
+    trigger:
+
+        # Le joueur doit être dans le monde configuré
+        # Fix : utiliser player's world (forme possessive) au lieu de world of player
+        # pour éviter l'erreur "There's no location in a command event"
+        if name of player's world is not {@world-name}:
+            send "%{@prefix}% &cVous devez être dans le monde &a%{@world-name}%&c pour utiliser cette commande." to player
+            stop
+
+        # ── Aide (aucun argument) ─────────────────────────────
+        if arg-1 is not set:
+            send "" to player
+            send " %{@prefix}% &7——— Thimble Event | Aide ———" to player
+            send "  &f/te setspawn  &7→ Définit la plateforme de départ" to player
+            send "  &f/te start     &7→ Lance la partie" to player
+            send "  &f/te stop      &7→ Arrête la partie en cours" to player
+            send "  &f/te info      &7→ Affiche l'état du jeu" to player
+            send "" to player
+            stop
+
+        # ── /te setspawn ──────────────────────────────────────
+        if arg-1 is "setspawn":
+            set {te.spawn} to location of player
+            send "%{@prefix}% &aPlateforme de départ définie avec succès." to player
+            send "  &7Position: &fx=&f%x-coord of player%&7, y=&f%y-coord of player%&7, z=&f%z-coord of player%" to player
+            stop
+
+        # ── /te info ──────────────────────────────────────────
+        if arg-1 is "info":
+            send "" to player
+            send " %{@prefix}% &7——— Statut du Dé à Coudre ———" to player
+            if {te.running} is true:
+                send "  &7Statut         : &aEn cours" to player
+            else:
+                send "  &7Statut         : &cArrêtée" to player
+            send "  &7Joueurs en jeu : &f%size of {te.joueurs::*}%" to player
+            send "  &7File d'attente : &f%size of {te.vague::*}%" to player
+            if {te.spawn} is set:
+                send "  &7Plateforme     : &aDéfinie" to player
+            else:
+                send "  &7Plateforme     : &cNon définie" to player
+            send "" to player
+            stop
+
+        # ── /te start ─────────────────────────────────────────
+        if arg-1 is "start":
+            if {te.running} is true:
+                send "%{@prefix}% &cUne partie est déjà en cours. Utilisez &f/te stop&c d'abord." to player
+                stop
+            if {te.spawn} is not set:
+                send "%{@prefix}% &cAucune plateforme définie. Utilisez &f/te setspawn&c d'abord." to player
+                stop
+
+            # Comptage des joueurs présents dans le monde configuré
+            set {_count} to 0
+            loop all players:
+                if name of loop-player's world is {@world-name}:
+                    add 1 to {_count}
+            if {_count} < 2:
+                send "%{@prefix}% &cIl faut au moins &f2 joueurs&c dans le monde &a%{@world-name}%&c pour lancer une partie." to player
+                stop
+
+            # Initialisation
+            set {te.running} to true
+            delete {te.joueurs::*}
+            delete {te.vague::*}
+
+            # Remplissage du bassin (remplacement de la diorite par de l'eau)
+            send "%{@prefix}% &7Remplissage du bassin (rayon 100 blocs)..." to player
+            loop all blocks in radius 100 around {te.spawn}:
+                if type of loop-block is diorite:
+                    set loop-block to water
+            send "%{@prefix}% &aBassin prêt. Lancement du compte à rebours." to player
+
+            # Compte à rebours de 5 secondes
+            loop 5 times:
+                set {_t} to 6 - loop-number
+                loop all players:
+                    if name of loop-player's world is {@world-name}:
+                        heal loop-player
+                        set food level of loop-player to 20
+                        send title "&aLe Dé à Coudre commence !" with subtitle "&e%{_t}% seconde(s)..." to loop-player for 2 seconds
+                        play sound "block.note_block.pling" to loop-player
+                wait 1 second
+
+            # Enregistrement des participants et mise en attente
+            loop all players:
+                if name of loop-player's world is {@world-name}:
+                    add loop-player to {te.joueurs::*}
+                    add loop-player to {te.vague::*}
+                    te_setWaiting(loop-player)
+
+            broadcast "%{@prefix}% &aLe Dé à Coudre a commencé ! &7(&f%size of {te.joueurs::*}% joueurs&7)"
+            te_nextPlayer()
+            stop
+
+        # ── /te stop ──────────────────────────────────────────
+        if arg-1 is "stop":
+            if {te.running} is not true:
+                send "%{@prefix}% &cAucune partie n'est en cours." to player
+                stop
+            te_forceStop(name of player)
+            stop
+
+        # Argument inconnu → affichage de l'aide
+        make player execute command "/te"
+
+# ══════════════════════════════════════════════
+#  Événements de jeu
+# ══════════════════════════════════════════════
+
+# Dégâts reçus → le joueur actif a raté son saut (élimination)
+on damage:
+    if {te.running} is not true:
+        stop
+    if {te.%uuid of victim%.playing} is true:
+        cancel event
+        remove victim from {te.joueurs::*}
+        te_setSpectating(victim)
+        broadcast "%{@prefix}% &c%victim% &7a raté son saut et est éliminé ! &7(&f%size of {te.joueurs::*}% joueur(s) restant(s)&7)"
+        te_nextPlayer()
+
+# Atterrissage sur une éponge mouillée → saut réussi, case comblée
+on walk on wet sponge:
+    if {te.running} is not true:
+        stop
+    if {te.%uuid of player%.playing} is true:
+        # La case d'atterrissage est comblée (le bassin rétrécit)
+        set block above event-block to diorite
+        te_setWaiting(player)
+        send action bar "&a✔ Beau saut ! Retour en file d'attente." to player
+        broadcast "%{@prefix}% &a%player% &7a réussi son saut !"
+        te_nextPlayer()
+
+# Faim → annulée pour le joueur actif (pas de famine pendant le saut)
+on food level change:
+    if {te.running} is not true:
+        stop
+    if {te.%uuid of player%.playing} is true:
+        cancel event
+
+# Déconnexion → retrait propre des listes de jeu
+on quit:
+    if {te.running} is not true:
+        stop
+    if {te.%uuid of player%.playing} is true:
+        # Le joueur actif se déconnecte pendant son saut : élimination
+        remove player from {te.joueurs::*}
+        remove player from {te.vague::*}
+        set {te.%uuid of player%.playing} to false
+        broadcast "%{@prefix}% &c%player% &7s'est déconnecté pendant son saut et est éliminé !"
+        te_nextPlayer()
+    else:
+        # Joueur en attente : retrait silencieux
+        remove player from {te.joueurs::*}
+        remove player from {te.vague::*}
