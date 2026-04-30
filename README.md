@@ -1,7 +1,9 @@
 # Thimble Event — Dé à Coudre
 
 > **Auteur :** Clément Raes — [Odysseum04](https://github.com/odysseum04)
+
 > **Assistance IA :** Script généré avec l'assistance de [Claude AI](https://claude.ai) (Anthropic)
+
 > **Compatibilité :** Skript 2.9+ | Minecraft 1.21.x | Aucun addon requis
 
 ---
