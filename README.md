@@ -1,7 +1,9 @@
 # Thimble Event — Dé à Coudre
 
 > **Auteur :** Clément Raes — [Odysseum04](https://github.com/odysseum04)
+
 > **Assistance IA :** Script généré avec l'assistance de [Claude AI](https://claude.ai) (Anthropic)
+
 > **Compatibilité :** Skript 2.9+ | Minecraft 1.21.x | Aucun addon requis
 
 ---
@@ -42,15 +44,6 @@ Les options se trouvent en haut du fichier `.sk`.
 | `prefix` | `[SERVER-NAME Events]` | Préfixe des messages en jeu |
 | `perm-admin` | `events.admin` | Permission requise pour `/te` |
 | `world-name` | `world` | Nom du monde dédié au mini-jeu |
-
-> ⚠️ **Règles importantes pour les options :**
->
-> **1. Pas de `< >` dans les valeurs** — ces caractères sont réservés par Skript pour les types d'arguments de commandes (ex. `[<text>]`). Les utiliser dans une option provoque `Can't understand this expression` partout où l'option est utilisée.
->
-> **2. Ne jamais encadrer `{@option}` avec `%...%`** — `{@option}` est une **substitution parse-time** résolue au chargement du script. Le wrapper `%...%` force une évaluation runtime qui échoue car la valeur contient des codes couleur Minecraft (`&r`, `&a`, etc.).
->
-> ✅ Correct : `send "{@prefix} &aTexte..." to player`
-> ❌ Incorrect : `send "%{@prefix}% &aTexte..." to player`
 
 ---
 
@@ -136,30 +129,6 @@ Quand il ne reste qu'un seul joueur — titre, broadcast et son de victoire.
 > 💡 Poser les éponges au **fond du bassin** sur un bloc solide. L'eau ne doit pas être trop profonde pour que `on walk on wet sponge` se déclenche.
 
 ---
-
-## Bugs corrigés & notes techniques
-
-### Erreur : `Can't understand this expression: &r[&aSERVER-NAME...]`
-**Cause :** `{@option}` est une substitution parse-time. L'encadrer avec `%...%` force Skript à l'évaluer au runtime, ce qui échoue car la valeur contient des codes couleur.
-**Correction :** `"%{@prefix}%"` → `"{@prefix}"` dans toutes les chaînes.
-
----
-
-### Erreur : `There's no loop that matches 'loop-player with volume X with pitch Y'`
-**Cause :** Skript parsait `to loop-player with volume X with pitch Y` comme une expression unique.
-**Correction :** Sons en forme simplifiée `play sound "X" to PLAYER`.
-
----
-
-### Erreur : `There's no location in a command event`
-**Cause :** Dans un `command` trigger, Skript n'expose pas de location implicite. Toute expression résolvant le monde d'un joueur (`player's world`, `world of player`, `world of location of player`) requiert ce contexte de location, absent dans les triggers commande.
-
-**Correction (deux niveaux) :**
-1. **`te_playerWorldName(p)`** — convertit le monde du joueur en texte via `"%world of {_p}%"` depuis une fonction, qui possède son propre contexte d'exécution sans cette restriction.
-2. **`te_isInConfiguredWorld(p)`** — compare le résultat de `te_playerWorldName()` à `{@world-name}` et retourne un booléen. Cette fonction est appelée partout où une vérification de monde est nécessaire, y compris dans le command trigger.
-
----
-
 ## Variables internes
 
 | Variable | Type | Description |
